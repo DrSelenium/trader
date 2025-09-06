@@ -10,25 +10,43 @@ def trading_bot():
     for event in data:
         id = event['id']
         title = event['title'].lower()
-        # simple sentiment analysis
-        positive_words = ['bullish', 'rise', 'up', 'gain', 'increase', 'positive', 'good', 'buy', 'long', 'pump', 'moon', 'trump', 'executive', 'order', 'reserve']
-        negative_words = ['bearish', 'fall', 'down', 'drop', 'decrease', 'negative', 'bad', 'sell', 'short', 'dump', 'crash']
+        # enhanced sentiment analysis with weights
+        positive_words = {
+            'bullish': 2, 'rise': 1, 'up': 1, 'gain': 1, 'increase': 1, 'positive': 1, 'good': 1, 'buy': 1, 'long': 1, 'pump': 1, 'moon': 1,
+            'trump': 2, 'executive': 1, 'order': 1, 'reserve': 1, 'surge': 1, 'rally': 1, 'breakthrough': 1, 'partnership': 1, 'investment': 1,
+            'adoption': 1, 'halving': 2, 'institutional': 1, 'approval': 1, 'green': 1, 'support': 1, 'optimism': 1, 'growth': 1, 'boom': 1
+        }
+        negative_words = {
+            'bearish': 2, 'fall': 1, 'down': 1, 'drop': 1, 'decrease': 1, 'negative': 1, 'bad': 1, 'sell': 1, 'short': 1, 'dump': 1, 'crash': 2,
+            'ban': 2, 'regulation': 1, 'sell-off': 1, 'decline': 1, 'plunge': 1, 'warning': 1, 'concern': 1, 'fear': 1, 'panic': 1, 'red': 1,
+            'opposition': 1, 'rejection': 1, 'downturn': 1, 'slump': 1
+        }
         score = 0
-        for word in positive_words:
+        for word, weight in positive_words.items():
             if word in title:
-                score += 1
-        for word in negative_words:
+                score += weight
+        for word, weight in negative_words.items():
             if word in title:
-                score -= 1
-        # check previous candles trend
+                score -= weight
+        # check for emphasis
+        if '!' in title or title.isupper():
+            score *= 1.5  # amplify sentiment if emphasized
+        # enhanced trend analysis
         previous = event.get('previous_candles', [])
         if len(previous) >= 2:
-            last_close = previous[-1]['close']
             first_close = previous[0]['close']
-            if last_close > first_close:
-                score += 0.5
-            else:
-                score -= 0.5
+            last_close = previous[-1]['close']
+            pct_change = (last_close - first_close) / first_close * 100
+            if pct_change > 1:
+                score += 1
+            elif pct_change < -1:
+                score -= 1
+            # also check volume trend
+            if len(previous) > 1:
+                avg_volume = sum(c['volume'] for c in previous) / len(previous)
+                last_volume = previous[-1]['volume']
+                if last_volume > avg_volume * 1.2:
+                    score += 0.5  # high volume might indicate strong move
         if score > 0:
             decision = 'LONG'
         elif score < 0:
